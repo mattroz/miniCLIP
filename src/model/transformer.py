@@ -27,7 +27,7 @@ From Radford et al. (2018):
 """
     
 class ResidualAttentionBlock(nn.Module):
-    def __init__(self, d_model: int, n_head: int, attention_mask: torch.Tensor = None):
+    def __init__(self, d_model: int, n_head: int):
         super().__init__()
 
         self.layernorm_1 = nn.LayerNorm(d_model)
@@ -38,16 +38,15 @@ class ResidualAttentionBlock(nn.Module):
             nn.GELU(),
             nn.Linear(d_model * 4, d_model)
         )
-        self.attention_mask = attention_mask
 
-    def apply_attention(self, x: torch.Tensor):
-        self.attention_mask = self.attention_mask.to(dtype=x.dtype, device=x.device) if self.attention_mask is not None else None
-        return self.multihead_attn(x, x, x, need_weights=False, attn_mask=self.attention_mask)[0]
+    def apply_attention(self, x: torch.Tensor, attention_mask: torch.Tensor = None):
+        attention_mask = attention_mask.to(dtype=x.dtype, device=x.device) if attention_mask is not None else None
+        return self.multihead_attn(x, x, x, need_weights=False, attn_mask=attention_mask)[0]
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor, attention_mask: torch.Tensor = None):
         identity = x
         x = self.layernorm_1(x)
-        x = self.apply_attention(x)
+        x = self.apply_attention(x, attention_mask)
         x = x + identity
         
         identity = x
@@ -63,11 +62,15 @@ class Transformer(nn.Module):
         super().__init__()
         self.d_model = d_model
         self.n_layers = n_layers
-        attention_mask = generate_attention_mask(sequence_length, device='cpu')
-        self.blocks = nn.Sequential(*[ResidualAttentionBlock(d_model, n_heads, attention_mask) for _ in range(n_layers)])
+        self.attention_mask = generate_attention_mask(sequence_length, device='cpu')
+        self.blocks = nn.ModuleList([ResidualAttentionBlock(d_model, n_heads) for _ in range(n_layers)])
 
-    def forward(self, x: torch.Tensor):
-        return self.blocks(x)
+    def forward(self, x: torch.Tensor, attention_mask: torch.Tensor = None):
+        attention_mask = self.attention_mask if attention_mask is None else attention_mask
+        for block in self.blocks:
+            x = block(x, attention_mask)
+        
+        return x
     
 
 if __name__ == "__main__":
