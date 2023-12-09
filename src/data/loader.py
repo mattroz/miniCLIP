@@ -39,9 +39,9 @@ class CocoDataset(Dataset):
         if self.transforms:
             image = self.transforms(image)
         
-        annotations_encoded = torch.tensor(self.tokenizer.encode(annotation["caption"]), dtype=torch.long)
+        #annotations_encoded = torch.tensor(self.tokenizer.encode(annotation["caption"]), dtype=torch.long)
         
-        return image, annotations_encoded
+        return image, annotation["caption"] #, annotations_encoded
 
 
 if __name__ == "__main__":
