@@ -1,11 +1,13 @@
 import pytest
 import tiktoken
 
+from itertools import product
+
 from src.data.tokenizer import Tokenizer
 
 
-@pytest.mark.parametrize("tokenizer_name", tiktoken.list_encoding_names())
-def test_tokenizer(tokenizer_name):
+@pytest.mark.parametrize("tokenizer_name, sequence_length", product(tiktoken.list_encoding_names(), (32, 64, 128)))
+def test_tokenizer(tokenizer_name, sequence_length):
     tokenizer = Tokenizer(bos_str="<|startoftext|>", eos_str="<|endoftext|>", tokenizer_name=tokenizer_name)
     
     text_batch = ['Most of the sheep in the pasture are lying down on the grass. ', 
@@ -14,9 +16,10 @@ def test_tokenizer(tokenizer_name):
                   'a red traffic light  and some people walking on a street', 
                   'A cat with hind legs on the edge of the bathtub and front paws on the toilet seat.', 
                   'Elvis and a young lady on a motorcycle with others standing around a store on the corner.']
-    encoded_batch = tokenizer.encode_batch(text_batch, max_length=64)
+    encoded_batch = tokenizer.encode_batch(text_batch, max_length=sequence_length)
     decoded_batch = tokenizer.decode_batch(encoded_batch, supress_special_tokens=True)
     
+    assert encoded_batch.shape == (len(text_batch), sequence_length)
     assert text_batch == decoded_batch
 
     assert "Hello world!" == tokenizer.decode(tokenizer.encode("Hello world!"))
