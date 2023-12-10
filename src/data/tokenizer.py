@@ -1,5 +1,3 @@
-import sys
-sys.path.append(".")
 import torch
 import tiktoken
 
@@ -57,24 +55,4 @@ class Tokenizer:
             decoded_batch = [decoded_batch[i].replace(self.bos_str, "").replace(self.eos_str, "") for i in range(len(decoded_batch))]
         
         return decoded_batch
-
-
-if __name__ == "__main__":
-    tokenizer = Tokenizer(bos_str="<|startoftext|>", eos_str="<|endoftext|>", tokenizer_name="gpt2")
     
-    text_batch = ["sentence number one", "sentence number two", "sentence number three four five six seven"]
-    
-    encoded_batch = tokenizer.encode_batch(text_batch, max_length=16)
-    print("Encoded batch: \n", encoded_batch.shape)
-    
-    decoded_batch = tokenizer.decode_batch(encoded_batch, supress_special_tokens=True)
-    print("Decoded batch: \n", decoded_batch)
-
-    assert text_batch == decoded_batch
-
-    text = "Hello world!"
-    encoded_text = tokenizer.encode(text)
-    print("Encoded text: \n", encoded_text)
-
-    decoded_text = tokenizer.decode(encoded_text)
-    print("Decoded text: \n", decoded_text)
