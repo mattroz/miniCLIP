@@ -7,7 +7,7 @@ import torch.nn as nn
 import numpy as np
 
 from src.model.text_encoder import TextEncoderV1
-from src.model.resnets import resnet50
+from src.model.vision_encoder import VisionEncoderV1
 
 
 class CLIP(nn.Module):
@@ -16,9 +16,7 @@ class CLIP(nn.Module):
 
 
 if __name__ == "__main__":
-    vision_encoder = resnet50(pretrained=False)
-    vision_encoder.fc = nn.Identity()
-
+    vision_encoder = VisionEncoderV1(model_name="resnet50", pretrained=False, out_features=512)
     text_encoder = TextEncoderV1(vocab_size=11, d_model=512, n_layers=8, n_heads=8, sequence_length=16)
 
     dummy_image = torch.rand(1, 3, 224, 224)
