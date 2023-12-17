@@ -16,9 +16,10 @@ def test_tokenizer(tokenizer_name, sequence_length):
                   'a red traffic light  and some people walking on a street', 
                   'A cat with hind legs on the edge of the bathtub and front paws on the toilet seat.', 
                   'Elvis and a young lady on a motorcycle with others standing around a store on the corner.']
-    encoded_batch = tokenizer.encode_batch(text_batch, max_length=sequence_length)
+    encoded_batch, attention_mask = tokenizer.encode_batch(text_batch, max_length=sequence_length)
     decoded_batch = tokenizer.decode_batch(encoded_batch, supress_special_tokens=True)
     
+    assert attention_mask.shape == (len(text_batch), sequence_length)
     assert encoded_batch.shape == (len(text_batch), sequence_length)
     assert text_batch == decoded_batch
 

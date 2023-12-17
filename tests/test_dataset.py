@@ -65,7 +65,7 @@ def test_loader(resize, batch_size, sequence_length):
         assert len(images) == batch_size
         assert len(captions) == batch_size
 
-        encoded_text = tokenizer.encode_batch(captions, max_length=sequence_length)
+        encoded_text, attention_mask = tokenizer.encode_batch(captions, max_length=sequence_length)
         decoded_text = tokenizer.decode_batch(encoded_text, supress_special_tokens=True)
 
         assert list(captions) == decoded_text
