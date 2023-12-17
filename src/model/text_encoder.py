@@ -20,12 +20,12 @@ class TextEncoderV1(nn.Module):
         self.positional_encoding = nn.Parameter(torch.empty(sequence_length, d_model))
         self.transformer = Transformer(d_model, n_layers, n_heads, sequence_length)
     
-    def forward(self, text: torch.Tensor) -> torch.Tensor:
+    def forward(self, text: torch.Tensor, attention_mask: torch.Tensor = None) -> torch.Tensor:
         x = self.token_embedding(text) # [batch_size, sequence_length, d_model]
         x = x + self.positional_encoding
 
         x = x.permute(1, 0, 2) # [batch, seqlen, d_modle] -> [seqlen, batch, d_model]
-        x = self.transformer(x)
+        x = self.transformer(x, attention_mask)
         x = x.permute(1, 0, 2) # [seq_len, batch, d_model] -> [batch, seq_len, d_model]
 
         return x
