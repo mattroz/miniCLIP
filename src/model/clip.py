@@ -11,20 +11,25 @@ from src.model.vision_encoder import VisionEncoderV1
 
 
 class CLIP(nn.Module):
-    def __init__(self, vision_encoder, text_encoder, embed_dim, temperature=0.07):
+    def __init__(self, vision_encoder, text_encoder, vision_embed_dim, text_embed_dim, embed_dim, temperature=0.07):
         super().__init__()
 
         self.vision_encoder = vision_encoder
         self.text_encoder = text_encoder
+        self.vision_embed_dim = vision_embed_dim
+        self.text_embed_dim = text_embed_dim
         self.embed_dim = embed_dim
-        self.temperature = temperature
+        self.temperature = torch.scalar_tensor(temperature)
     
-        self.layer_norm = nn.LayerNorm(self.embed_dim)
+        self.layer_norm = nn.LayerNorm(self.text_embed_dim)
         # layer to project the text embeddings to the same dimension as the vision embeddings
-        self.projection = nn.Linear(self.embed_dim, self.vision_encoder.out_features, bias=False)
+        self.text_projection = nn.Linear(self.text_embed_dim, self.embed_dim, bias=False)
+        self.vision_projection = nn.Linear(self.vision_embed_dim, self.embed_dim, bias=False)
 
     def vision_adapter(self, image):
-        return self.vision_encoder(image)
+        x = self.vision_encoder(image)
+        x = self.vision_projection(x)
+        return x
     
     """
     From the CLIP paper, page 5:
@@ -43,9 +48,20 @@ class CLIP(nn.Module):
         # which is the [EOS] token from the original text.
         eot_token_position = text.argmax(dim=-1)
         x = x[torch.arange(x.shape[0]), eot_token_position]
-        x = self.projection(x)
+        x = self.text_projection(x)
 
         return x
+    
+    def forward(self, image, text):
+        vision_embedding = self.vision_adapter(image)
+        text_embedding = self.text_adapter(text)
+
+        vision_embedding_norm = vision_embedding / torch.linalg.norm(vision_embedding, dim=1, ord=2, keepdim=True)
+        text_embedding_norm = text_embedding / torch.linalg.norm(text_embedding, dim=1, ord=2, keepdim=True)
+
+        logits = torch.matmul(vision_embedding_norm, text_embedding_norm.t()) * torch.exp(self.temperature)
+
+        return logits
         
 
 if __name__ == "__main__":
@@ -55,10 +71,13 @@ if __name__ == "__main__":
     dummy_image = torch.rand(3, 3, 224, 224)
     dummy_text_tokenized = torch.randint(low=0, high=10 , size=(3, 16))
 
-    clip = CLIP(vision_encoder, text_encoder, embed_dim=512)
+    clip = CLIP(vision_encoder, text_encoder, text_embed_dim=512, vision_embed_dim=512, embed_dim=512)
 
     encoded_vision_feat = clip.vision_adapter(dummy_image)
     encoded_text_feat = clip.text_adapter(dummy_text_tokenized)
+    logits = clip(dummy_image, dummy_text_tokenized)
 
     print("Vision features: ", encoded_vision_feat.shape)
     print("Text features: ", encoded_text_feat.shape)
+    print("Logits: ", logits.shape)
+    print(logits)
