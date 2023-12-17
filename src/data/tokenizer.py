@@ -41,12 +41,16 @@ class Tokenizer:
     def encode_batch(self, batched_text, max_length=None):
         tokenized_text = self.base_tokenizer.encode_batch(batched_text)
         tokenized_text = [torch.tensor([self.bos_token] + _tokenized + [self.eos_token], dtype=torch.long) for _tokenized in tokenized_text]
+        attention_mask = [torch.ones_like(_tokenized, dtype=torch.long) for _tokenized in tokenized_text]
+
         tokenized_text = pad_sequence(tokenized_text, batch_first=True, padding_value=self.eos_token)
-        
+        attention_mask = pad_sequence(attention_mask, batch_first=True, padding_value=0)
+
         if max_length:
             tokenized_text = nn.functional.pad(tokenized_text, (0, max_length - tokenized_text.shape[1]), value=self.eos_token)
+            attention_mask = nn.functional.pad(attention_mask, (0, max_length - attention_mask.shape[1]), value=0)
 
-        return tokenized_text
+        return tokenized_text, attention_mask
     
     def decode_batch(self, batched_tokens, supress_special_tokens=True):
         decoded_batch = self.base_tokenizer.decode_batch(batched_tokens.tolist())
