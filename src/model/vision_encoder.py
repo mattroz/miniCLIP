@@ -8,6 +8,7 @@ class VisionEncoderV1(nn.Module):
     def __init__(self, model_name="resnet34", pretrained=True, out_features=1024):
         super(VisionEncoderV1, self).__init__()
 
+        self.out_features = out_features
         if model_name == "resnet34":
             self.backbone = resnet34(pretrained=pretrained)
         elif model_name == "resnet50":
