@@ -39,14 +39,14 @@ class ResidualAttentionBlock(nn.Module):
             nn.Linear(d_model * 4, d_model)
         )
 
-    def apply_attention(self, x: torch.Tensor, attention_mask: torch.Tensor = None):
+    def apply_attention(self, x: torch.Tensor, padding_mask: torch.Tensor = None, attention_mask: torch.Tensor = None):
         attention_mask = attention_mask.to(dtype=x.dtype, device=x.device) if attention_mask is not None else None
-        return self.multihead_attn(x, x, x, need_weights=False, attn_mask=attention_mask)[0]
+        return self.multihead_attn(x, x, x, need_weights=False, key_padding_mask=padding_mask, attn_mask=attention_mask)[0]
 
-    def forward(self, x: torch.Tensor, attention_mask: torch.Tensor = None):
+    def forward(self, x: torch.Tensor, padding_mask: torch.Tensor = None, attention_mask: torch.Tensor = None):
         identity = x
         x = self.layernorm_1(x)
-        x = self.apply_attention(x, attention_mask)
+        x = self.apply_attention(x, padding_mask, attention_mask)
         x = x + identity
         
         identity = x
@@ -65,10 +65,10 @@ class Transformer(nn.Module):
         self.attention_mask = generate_attention_mask(sequence_length, device='cpu')
         self.blocks = nn.ModuleList([ResidualAttentionBlock(d_model, n_heads) for _ in range(n_layers)])
 
-    def forward(self, x: torch.Tensor, attention_mask: torch.Tensor = None):
+    def forward(self, x: torch.Tensor, padding_mask: torch.Tensor = None, attention_mask: torch.Tensor = None):
         attention_mask = self.attention_mask if attention_mask is None else attention_mask
         for block in self.blocks:
-            x = block(x, attention_mask)
+            x = block(x, padding_mask, attention_mask)
         
         return x
     
