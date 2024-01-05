@@ -8,6 +8,7 @@ import numpy as np
 
 from src.model.text_encoder import TextEncoderV1
 from src.model.vision_encoder import VisionEncoderV1
+from src.data.tokenizer import Tokenizer
 
 
 class CLIP(nn.Module):
@@ -39,8 +40,8 @@ class CLIP(nn.Module):
         which is layer normalized and then linearly projected into
         the multi-modal embedding space.
     """
-    def text_adapter(self, text):
-        x = self.text_encoder(text)
+    def text_adapter(self, text, padding_mask=None, attention_mask=None):
+        x = self.text_encoder(text, padding_mask, attention_mask)
 
         x = self.layer_norm(x)
 
@@ -52,9 +53,9 @@ class CLIP(nn.Module):
 
         return x
     
-    def forward(self, image, text):
+    def forward(self, image, text, padding_mask=None, attention_mask=None):
         vision_embedding = self.vision_adapter(image)
-        text_embedding = self.text_adapter(text)
+        text_embedding = self.text_adapter(text, padding_mask=padding_mask, attention_mask=attention_mask)
 
         vision_embedding_norm = vision_embedding / torch.linalg.norm(vision_embedding, dim=1, ord=2, keepdim=True)
         text_embedding_norm = text_embedding / torch.linalg.norm(text_embedding, dim=1, ord=2, keepdim=True)
@@ -65,17 +66,29 @@ class CLIP(nn.Module):
         
 
 if __name__ == "__main__":
-    vision_encoder = VisionEncoderV1(model_name="resnet50", pretrained=False, out_features=512)
-    text_encoder = TextEncoderV1(vocab_size=11, d_model=512, n_layers=8, n_heads=8, sequence_length=16)
+    batch_size = 3
+    seqlen = 32
+    d_model = 512
 
-    dummy_image = torch.rand(3, 3, 224, 224)
-    dummy_text_tokenized = torch.randint(low=0, high=10 , size=(3, 16))
+    tokenizer = Tokenizer(bos_str="<|startoftext|>", eos_str="<|endoftext|>", tokenizer_name="gpt2")
 
-    clip = CLIP(vision_encoder, text_encoder, text_embed_dim=512, vision_embed_dim=512, embed_dim=512)
+    vision_encoder = VisionEncoderV1(model_name="resnet50", pretrained=False, out_features=d_model)
+    text_encoder = TextEncoderV1(vocab_size=tokenizer.vocab_size, d_model=d_model, n_layers=8, n_heads=8, sequence_length=seqlen)
+
+    dummy_text_batch = ['Most of the sheep in the pasture are lying down on the grass.', 
+                        'Plate of pasta with lemon and broccoli mixed in it.', 
+                        'some parked bicycles and two women on a bench and a book']
+
+    dummy_image = torch.rand(batch_size, 3, 224, 224)
+    dummy_text_tokenized, padding_mask = tokenizer.encode_batch(dummy_text_batch, max_length=seqlen)
+
+    clip = CLIP(vision_encoder, text_encoder, text_embed_dim=d_model, vision_embed_dim=d_model, embed_dim=d_model)
+
+    print("n params: ", sum(p.numel() for p in clip.parameters() if p.requires_grad))
 
     encoded_vision_feat = clip.vision_adapter(dummy_image)
-    encoded_text_feat = clip.text_adapter(dummy_text_tokenized)
-    logits = clip(dummy_image, dummy_text_tokenized)
+    encoded_text_feat = clip.text_adapter(dummy_text_tokenized, padding_mask=padding_mask)
+    logits = clip(dummy_image, dummy_text_tokenized, padding_mask=padding_mask)
 
     print("Vision features: ", encoded_vision_feat.shape)
     print("Text features: ", encoded_text_feat.shape)
