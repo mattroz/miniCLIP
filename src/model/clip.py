@@ -20,6 +20,7 @@ class CLIP(nn.Module):
         self.vision_embed_dim = vision_embed_dim
         self.text_embed_dim = text_embed_dim
         self.embed_dim = embed_dim
+        # Should be a learned parameter, let it be a fixed value for now
         self.temperature = torch.scalar_tensor(temperature)
     
         self.layer_norm = nn.LayerNorm(self.text_embed_dim)
@@ -57,10 +58,10 @@ class CLIP(nn.Module):
         vision_embedding = self.vision_adapter(image)
         text_embedding = self.text_adapter(text, padding_mask=padding_mask, attention_mask=attention_mask)
 
+        # pairwise cosine similarity (vision <--> text)
         vision_embedding_norm = vision_embedding / torch.linalg.norm(vision_embedding, dim=1, ord=2, keepdim=True)
         text_embedding_norm = text_embedding / torch.linalg.norm(text_embedding, dim=1, ord=2, keepdim=True)
-
-        logits = torch.matmul(vision_embedding_norm, text_embedding_norm.t()) * torch.exp(self.temperature)
+        logits = torch.matmul(vision_embedding_norm, text_embedding_norm.t())* torch.exp(self.temperature)
 
         return logits
         
@@ -94,3 +95,4 @@ if __name__ == "__main__":
     print("Text features: ", encoded_text_feat.shape)
     print("Logits: ", logits.shape)
     print(logits)
+
