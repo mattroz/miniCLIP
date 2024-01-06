@@ -22,17 +22,22 @@ class CLIP(nn.Module):
         self.embed_dim = embed_dim
         
         """From CLIP paper, section 2.3
-        Finally, the temperature parameter
-        which controls the range of the logits in the softmax, τ , is
-        directly optimized during training as a log-parameterized
-        multiplicative scalar to avoid turning as a hyper-parameter.
+        Finally, the temperature parameter which controls the range of the logits in the softmax, τ, is
+        directly optimized during training as a log-parameterized multiplicative scalar to avoid turning as a hyper-parameter.
         """
-        self.temperature = torch.scalar_tensor(temperature)
+        self.temperature = nn.Parameter(torch.log(torch.scalar_tensor(1 / temperature)))
     
         self.layer_norm = nn.LayerNorm(self.text_embed_dim)
         # layer to project the text embeddings to the same dimension as the vision embeddings
         self.text_projection = nn.Linear(self.text_embed_dim, self.embed_dim, bias=False)
         self.vision_projection = nn.Linear(self.vision_embed_dim, self.embed_dim, bias=False)
+
+        self.initialize_parameters()
+
+    def initialize_parameters(self):
+        nn.init.normal_(self.text_encoder.token_embedding.weight, std=0.02)
+        nn.init.normal_(self.text_encoder.positional_encoding, std=0.01)
+        nn.init.normal_(self.text_projection.weight, std=self.text_encoder.d_model ** -0.5)
 
     def vision_adapter(self, image):
         x = self.vision_encoder(image)
@@ -49,25 +54,23 @@ class CLIP(nn.Module):
     """
     def text_adapter(self, text, padding_mask=None, attention_mask=None):
         x = self.text_encoder(text, padding_mask, attention_mask)
-
         x = self.layer_norm(x)
-
         # We should pick the activations of the highest token in the sequence, 
         # which is the [EOS] token from the original text.
         eot_token_position = text.argmax(dim=-1)
         x = x[torch.arange(x.shape[0]), eot_token_position]
         x = self.text_projection(x)
-
         return x
     
     def forward(self, image, text, padding_mask=None, attention_mask=None):
         vision_embedding = self.vision_adapter(image)
         text_embedding = self.text_adapter(text, padding_mask=padding_mask, attention_mask=attention_mask)
-
+        
         # pairwise cosine similarity (vision <--> text)
         vision_embedding_norm = vision_embedding / torch.linalg.norm(vision_embedding, dim=1, ord=2, keepdim=True)
         text_embedding_norm = text_embedding / torch.linalg.norm(text_embedding, dim=1, ord=2, keepdim=True)
-        logits = torch.matmul(vision_embedding_norm, text_embedding_norm.t())* torch.exp(self.temperature)
+        
+        logits = torch.matmul(vision_embedding_norm, text_embedding_norm.T) * torch.exp(self.temperature)
 
         return logits
         
