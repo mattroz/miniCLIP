@@ -20,7 +20,13 @@ class CLIP(nn.Module):
         self.vision_embed_dim = vision_embed_dim
         self.text_embed_dim = text_embed_dim
         self.embed_dim = embed_dim
-        # Should be a learned parameter, let it be a fixed value for now
+        
+        """From CLIP paper, section 2.3
+        Finally, the temperature parameter
+        which controls the range of the logits in the softmax, τ , is
+        directly optimized during training as a log-parameterized
+        multiplicative scalar to avoid turning as a hyper-parameter.
+        """
         self.temperature = torch.scalar_tensor(temperature)
     
         self.layer_norm = nn.LayerNorm(self.text_embed_dim)
