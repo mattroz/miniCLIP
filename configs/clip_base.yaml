@@ -1,6 +1,8 @@
 data:
-  path_to_annotation: "/data/coco/annotations/captions_train2017.json"
-  path_to_images: "data/coco/images/train2017"
+  path_to_train_annotation: "coco/annotations/captions_train2017.json"
+  path_to_train_images: "coco/images/train2017"
+  path_to_val_annotation: "coco/annotations/captions_val2017.json"
+  path_to_val_images: "coco/images/val2017"
   sequence_length: 64
   image_size: 224
   tokenizer_name: gpt2
@@ -9,8 +11,8 @@ data:
 
 vision_encoder:
   embed_dim: 512
-  backbone_name: resnet50
-  pretrained: True
+  backbone_name: resnet101
+  pretrained: False
 
 text_encoder:
   embed_dim: 512
@@ -22,12 +24,13 @@ clip_model:
   temperature: 0.07
 
 train:
-  batch_size: 2
-  num_workers: 16
-  num_epochs: 10
-  learning_rate: 0.0001
+  batch_size: 50
+  num_workers: 32
+  num_epochs: 3
+  learning_rate: 0.0003
   weight_decay: 0.0001
   warmup_steps: 1000
-  log_every_n_steps: 100
-  save_every_n_steps: 1000
+  validate_every_n_epochs: 1
+  save_every_n_epochs: 1
   random_seed: 92837465
+  device: cuda:0
