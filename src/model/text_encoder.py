@@ -16,6 +16,7 @@ class TextEncoderV1(nn.Module):
                  sequence_length: int) -> None:
         super().__init__()
 
+        self.d_model = d_model
         self.token_embedding = nn.Embedding(vocab_size, d_model)         
         self.positional_encoding = nn.Parameter(torch.empty(sequence_length, d_model))
         self.transformer = Transformer(d_model, n_layers, n_heads, sequence_length)
