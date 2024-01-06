@@ -17,7 +17,8 @@ class Tokenizer:
             mergeable_ranks=base_encoder._mergeable_ranks,
             special_tokens={
                 **base_encoder._special_tokens,
-                self.bos_str: base_encoder.max_token_value + 1
+                self.bos_str: base_encoder.max_token_value,
+                self.eos_str: base_encoder.max_token_value + 1
             }
         )
 
