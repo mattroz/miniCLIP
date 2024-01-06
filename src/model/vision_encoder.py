@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 
 from torchvision.models import resnet34, resnet50, resnet101, resnet152
+from torchvision.models.resnet import ResNet34_Weights, ResNet50_Weights, ResNet101_Weights, ResNet152_Weights
 
 
 class VisionEncoderV1(nn.Module):
@@ -10,13 +11,13 @@ class VisionEncoderV1(nn.Module):
 
         self.out_features = out_features
         if model_name == "resnet34":
-            self.backbone = resnet34(pretrained=pretrained)
+            self.backbone = resnet34(weights=ResNet34_Weights.DEFAULT if pretrained else None)
         elif model_name == "resnet50":
-            self.backbone = resnet50(pretrained=pretrained)
+            self.backbone = resnet50(weights=ResNet50_Weights.DEFAULT if pretrained else None)
         elif model_name == "resnet101":
-            self.backbone = resnet101(pretrained=pretrained)
+            self.backbone = resnet101(weights=ResNet101_Weights.DEFAULT if pretrained else None)
         elif model_name == "resnet152":
-            self.backbone = resnet152(pretrained=pretrained)
+            self.backbone = resnet152(weights=ResNet152_Weights.DEFAULT if pretrained else None)
         else:
             raise ValueError("model_name must be in [resnet34, resnet50, resnet101, resnet152]")
 
