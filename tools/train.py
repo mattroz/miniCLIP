@@ -36,14 +36,18 @@ def read_args():
     return args
 
 
-def run_training(config: DictConfig):
-    device = torch.device(config.train.device)
+def log_loss_to_file(config: DictConfig, mode: str, epoch: int, loss: float, lr: float):
+    with open(config.path_to_training_progress_log_file, "a") as f:
+        f.write(f"[{mode} @ epoch#{epoch}], {loss:.5f}, {lr:.8f}\n")
 
-    logger.info(f"Loading tokenizer {config.data.tokenizer_name}")
-    tokenizer = Tokenizer(bos_str=config.data.bos_str, 
-                          eos_str=config.data.eos_str, 
-                          tokenizer_name=config.data.tokenizer_name)
 
+def save_snapshot(config: DictConfig, model: nn.Module, epoch: int):
+    path_to_save_ckpt = Path(config.path_to_checkpoints, f"{config.experiment_name}_epoch_{epoch + 1}.pth")
+    logger.info(f"Saving model to {str(path_to_save_ckpt)}")
+    torch.save(model.state_dict(), path_to_save_ckpt)
+
+
+def prepare_data(config: DictConfig):
     train_transforms = transforms.Compose([
         transforms.ToPILImage(),
         transforms.Resize(size=config.data.image_size, 
@@ -56,14 +60,23 @@ def run_training(config: DictConfig):
                              std=(0.26862954, 0.26130258, 0.27577711))
     ])
 
-    logger.info("Initializing COCO dataset")
+    val_transforms = transforms.Compose([
+        transforms.ToPILImage(),
+        transforms.Resize(size=(config.data.image_size, config.data.image_size), 
+                          interpolation=transforms.InterpolationMode.BICUBIC,
+                          antialias=None),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=(0.48145466, 0.4578275, 0.40821073), 
+                             std=(0.26862954, 0.26130258, 0.27577711))
+    ])
+
     train_dataset = CocoDataset(path_to_annotation=config.data.path_to_train_annotation, 
                                 path_to_images=config.data.path_to_train_images, 
                                 transforms=train_transforms)
 
     val_dataset = CocoDataset(path_to_annotation=config.data.path_to_val_annotation, 
                               path_to_images=config.data.path_to_val_images,
-                              transforms=None)
+                              transforms=val_transforms)
 
     train_dataloader = DataLoader(dataset=train_dataset, 
                                   batch_size=config.train.batch_size, 
@@ -74,10 +87,25 @@ def run_training(config: DictConfig):
     val_dataloader = DataLoader(dataset=val_dataset, 
                                 batch_size=config.train.batch_size, 
                                 shuffle=False, 
+                                pin_memory=True,
                                 num_workers=config.train.num_workers)
     
-    logger.info(f"Train dataset contains {len(train_dataset)} samples")
-    logger.info(f"Val dataset contains {len(val_dataset)} samples")
+    return train_dataloader, val_dataloader
+
+
+def run_training(config: DictConfig):
+    device = torch.device(config.train.device)
+
+    logger.info(f"Loading tokenizer {config.data.tokenizer_name}")
+    tokenizer = Tokenizer(bos_str=config.data.bos_str, 
+                          eos_str=config.data.eos_str, 
+                          tokenizer_name=config.data.tokenizer_name)
+
+    logger.info("Initializing COCO datasets")
+    train_dataloader, val_dataloader = prepare_data(config)
+    
+    logger.info(f"Train dataset contains {len(train_dataloader) * config.train.batch_size} samples")
+    logger.info(f"Val dataset contains {len(val_dataloader) * config.train.batch_size} samples")
 
     logger.info("Initializing CLIP")
     model = make_CLIP(vocab_size=tokenizer.vocab_size, 
@@ -104,18 +132,18 @@ def run_training(config: DictConfig):
     logger.info("Initializing loss function")
     criterion = ContrastiveCrossEntropy()
 
-    logger.info(f"Initializing learning rate scheduler [CosineAnnealingLR, T_max={config.train.num_epochs * len(train_dataloader)}]")
-    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.train.num_epochs * len(train_dataloader))
+    logger.info(f"Initializing learning rate scheduler [CosineAnnealingLR, T_max={config.train.num_epochs}]")
+    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.train.num_epochs)
 
     logger.info(f"Starting training for {config.train.num_epochs} epochs")
 
-    train_pbar = tqdm(train_dataloader, total=len(train_dataloader), desc="training")
     for epoch in range(config.train.num_epochs):
         logger.info(f"Epoch {epoch + 1}/{config.train.num_epochs}")
-        
+                
         train_loss = []
         model.train()
 
+        train_pbar = tqdm(train_dataloader, total=len(train_dataloader), desc="training")
         for batch_idx, (images, captions) in enumerate(train_pbar):
             captions, padding_mask = tokenizer.encode_batch(captions, max_length=config.data.sequence_length)
             
@@ -140,6 +168,8 @@ def run_training(config: DictConfig):
             train_pbar.set_description(pbar_desc)
 
         logger.info(f"train loss @ epoch {epoch}: {np.mean(train_loss):.5f}")
+        log_loss_to_file(config, mode="TRAIN", epoch=epoch, loss=np.mean(train_loss), lr=current_lr)
+
         lr_scheduler.step()
 
         if (epoch + 1) % config.train.validate_every_n_epochs == 0:
@@ -166,12 +196,10 @@ def run_training(config: DictConfig):
                 val_pbar.set_description(pbar_desc)
 
             logger.info(f"val loss @ epoch {epoch}: {np.mean(val_loss):.5f}")
-
+            log_loss_to_file(config, mode="VAL", epoch=epoch, loss=np.mean(val_loss), lr=current_lr)
+            
         if (epoch + 1) % config.train.save_every_n_epochs == 0:
-            path_to_save_ckpt = Path(config.path_to_checkpoints, f"{config.experiment_name}_epoch_{epoch + 1}.pth")
-            logger.info(f"Saving model to {str(path_to_save_ckpt)}")
-            torch.save(model.state_dict(), path_to_save_ckpt)
-    
+            save_snapshot(config, model, epoch)
     
 
 if __name__ == "__main__":
@@ -186,12 +214,14 @@ if __name__ == "__main__":
     path_to_checkpoints.mkdir(parents=True, exist_ok=True)
 
     path_to_log_file = Path(path_to_experiment_dir, "train.log").resolve()
+    path_to_training_progress_log_file = Path(path_to_artifacts, "training_progress.log").resolve()
 
     config = load_config(args.path_to_config)
     config.experiment_name = experiment_name
     config.path_to_experiment_dir = str(path_to_experiment_dir)
     config.path_to_artifacts = str(path_to_artifacts)
     config.path_to_checkpoints = str(path_to_checkpoints)
+    config.path_to_training_progress_log_file = str(path_to_training_progress_log_file)
     path_to_save_config = Path(config.path_to_experiment_dir, config.experiment_name + ".yaml")
 
     config = merge_configs(config, args)
@@ -205,6 +235,7 @@ if __name__ == "__main__":
     fix_random_seeds(config.train.random_seed)
     
     logger.info("Running training")
+    OmegaConf.save(config, path_to_save_config)
     try:
         run_training(config)
     except Exception as e:
