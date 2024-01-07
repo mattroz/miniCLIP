@@ -29,16 +29,17 @@ After that, run:
 python tools/train.py --path_to_config=configs/clip_base.yaml --path_to_log=logs/
 ```
 
-This will create directory structure under the `log/` directory for each run separately (aka experiment directories):
+This will create directory structure under the `logs/` directory for each run separately (aka experiment directories):
 ```
 logs/
   |--{experiment_name}/
-  |    |--artifacts/
-  |    |--checkpoints/
-  |--train.log
-  |--{experiment_name}.yaml               
+      |--artifacts/
+      |--checkpoints/
+      |--train.log
+      |--{experiment_name}.yaml               
 ```
 Under the `logs/{experiment_name}/artifacts/` a `training_progress.log` will be saved, containing losses for train and validation.
+Each training run generates an overrided config and saves it under the `logs/{experiment_name}/` directory.
 
 ### Plot similarity matrices
 To plot similarity matrices on validation dataset, run:
