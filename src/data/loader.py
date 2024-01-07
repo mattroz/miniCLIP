@@ -37,4 +37,7 @@ class CocoDataset(Dataset):
         if self.transforms:
             image = self.transforms(image)
         
+        # Handle uppercase-only annotations
+        annotation["caption"] = annotation["caption"][0] + annotation["caption"][1:].lower()
+
         return image, annotation["caption"]
