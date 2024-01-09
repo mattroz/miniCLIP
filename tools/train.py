@@ -156,7 +156,6 @@ def run_training(config: DictConfig):
             loss.backward()
 
             if "clip_grad_norm" in config.train:
-                logger.info(f"Clip gradient norm is enabled, clipping at {config.train.clip_grad_norm}")
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=config.train.clip_grad_norm)
 
             optimizer.step()
