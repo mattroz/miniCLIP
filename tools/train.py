@@ -117,10 +117,6 @@ def run_training(config: DictConfig):
                       sequence_length=config.data.sequence_length,
                       temperature=config.clip_model.temperature).to(device)
     
-    if "clip_grad_norm" in config.train:
-        logger.info(f"Clip gradient norm is enabled, clipping at {config.train.clip_grad_norm}")
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=config.train.clip_grad_norm)
-    
     num_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
     config.num_parameters = num_parameters
 
@@ -158,6 +154,11 @@ def run_training(config: DictConfig):
             loss = criterion(vision_text_logits)
 
             loss.backward()
+
+            if "clip_grad_norm" in config.train:
+                logger.info(f"Clip gradient norm is enabled, clipping at {config.train.clip_grad_norm}")
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=config.train.clip_grad_norm)
+
             optimizer.step()
             
             train_loss.append(loss.item())
